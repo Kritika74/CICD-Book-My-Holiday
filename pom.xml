@@ -37,7 +37,7 @@
 						<muleVersion>4.4.0</muleVersion>
 						<username>kritika74</username>
 						<password>Kashyap@12345</password>
-						<applicationName>Hotel_Booking</applicationName>
+						<applicationName>HotelBooking-API-v1</applicationName>
 						<environment>Sandbox</environment>
 						<businessGroup>Apisero Inc</businessGroup>
 						<workerType>Micro</workerType>
