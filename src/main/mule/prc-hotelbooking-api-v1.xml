@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+	<flow name="findHotel" doc:id="6e2841b3-3eab-4434-a79c-37c47a56b4aa" >
+		<try doc:name="Try" doc:id="1cb1b32e-ac0c-4c88-bff0-dcb58758c23d" >
+			<db:select doc:name="Select" doc:id="c2c828ff-d6a1-4222-9c56-b6106d268558" config-ref="Database_Config">
+			<db:sql><![CDATA[select * from Hotel where location= :location]]></db:sql>
+			<db:input-parameters><![CDATA[#[{"location": vars.location}]]]></db:input-parameters>
+		</db:select>
+		</try>
+		<validation:validate-size doc:name="Validate size" doc:id="240ceead-88ea-4688-8a18-d30bf39bb78f" value="#[payload]" min="1" message="#[&quot;Sorry, we'll be reaching there soon!!!&quot;]"/>
+		<ee:transform doc:name="Transform Message" doc:id="712607f9-942c-4e4c-aa46-0b66ff2e4239" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml
+---
+ findHotelResponse:{
+  (payload map {
+        hotel: {
+          id: $.ID,
+          hotelName: $.Name,
+          location: $.Location,
+          checkInTime: $.CheckInTime,
+          checkOutTime: $.CheckOutTime,
+          rating: $.Rating,
+          noOfPersons: $.PersonsPerRoom,
+          price: $.Price
+        }
+    })
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="getHotelList" doc:id="83319795-3fc5-4612-84ba-1ddfcf192456" >
+		<try doc:name="Try" doc:id="f88bb6e4-44a2-49c9-94f7-3e589ed12873" >
+			<db:select doc:name="Select" doc:id="1a390a1a-c0b8-447b-b831-dce4d0be6669" config-ref="Database_Config">
+			<db:sql><![CDATA[Select * from Hotel]]></db:sql>
+		</db:select>
+		</try>
+		<validation:validate-size doc:name="Validate size" doc:id="b5b8c2fb-4421-4afb-9d0b-c903cc9aecb5" value="#[payload]" min="1" message='#["Please try again..."]'/>
+		<ee:transform doc:name="Transform Message" doc:id="4ad6cf6b-4150-40bd-b850-29dcbc084ff3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml
+---
+getHotelListResponse:{
+  (payload map {
+        hotel: {
+          id: $.ID,
+          hotelName: $.Name,
+          location: $.Location,
+          checkInTime: $.CheckInTime,
+          checkOutTime: $.CheckOutTime,
+          rating: $.Rating,
+          noOfPersons: $.PersonsPerRoom,
+          price: $.Price
+        }
+    })
+} 
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="bookHotel" doc:id="9876035f-e0ad-4377-b379-f1abb99f6e7a" >
+		<ee:transform doc:name="Transform Message" doc:id="77e8015b-6c8b-4ce3-bd20-062cdfc64523" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	id: payload.id,
+	location: payload.location,
+	roomsBooked: payload.noOfRoomsBooked
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<set-variable value="#[payload.id]" doc:name="Set ID" doc:id="91e13a9a-4f5e-4b97-b980-18b70cf43cfa" variableName="id"/>
+		<set-variable value="#[payload.roomsBooked]" doc:name="Set number of rooms required" doc:id="369f085f-cc78-4aff-b153-9240db10428e" variableName="roomsBooked" />
+		<try doc:name="Try" doc:id="eeeabfeb-5b84-4c50-b08f-0d4166c66b06" >
+			<db:select doc:name="Select" doc:id="6d60e8c8-41c1-417f-b735-8f98d26ba13e" config-ref="Database_Config">
+				<db:sql><![CDATA[select ID,Location,AvailableRooms from Hotel where ID= :id]]></db:sql>
+				<db:input-parameters><![CDATA[#[{"id":vars.id}]]]></db:input-parameters>
+			</db:select>
+			<validation:is-number numberType="INTEGER" doc:name="Check Room availability" doc:id="84daf392-c675-484a-ae27-3742f1dac0aa" value="#[payload.AvailableRooms[0] - vars.roomsBooked]" minValue="0" message='#["Sorry, the required number of rooms are not available"]' />
+			<db:insert doc:name="Insert" doc:id="a5df4a20-188e-4eca-a497-1f773278a032" config-ref="Database_Config">
+			<db:sql><![CDATA[insert into HotelBooking(ID,Location,NoOfRoomsBooked) 
+values(:id,:location,:noOfRoomsBooked)]]></db:sql>
+			<db:input-parameters><![CDATA[#[{"id": vars.id,
+	"location": payload.Location[0],
+	"noOfRoomsBooked": vars.roomsBooked
+}]]]></db:input-parameters>
+		</db:insert>
+			<db:update doc:name="Update" doc:id="b61669ea-5f7e-4553-9807-dbca56100f82" config-ref="Database_Config">
+			<db:sql><![CDATA[Update Hotel set AvailableRooms= (AvailableRooms - :roomsBooked) 
+where ID= :id]]></db:sql>
+			<db:input-parameters><![CDATA[#[{"roomsBooked": vars.roomsBooked,"id": vars.id}]]]></db:input-parameters>
+		</db:update>
+		</try>
+		<db:select doc:name="Select" doc:id="7b2a7522-794c-4df0-9b45-17a7b4de34d8" config-ref="Database_Config">
+			<db:sql><![CDATA[Select max(PNR) from HotelBooking]]></db:sql>
+		</db:select>
+		<set-variable value="#[message.payload.PNR]" doc:name="Set Variable" doc:id="d6a6b8a1-c0eb-46c5-8e02-18d90e3477f4" variableName="PNR" />
+		<ee:transform doc:name="Transform Message" doc:id="bba09d4f-52ba-48ab-aa90-ce58c097c512" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml
+---
+{
+    bookHotelResponse: {
+        booking: {
+            message: "Booking successful",
+            pnr: vars.PNR
+            } 
+    }
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="cancelHotel" doc:id="87946c14-4df4-4f42-9c80-1214f5055dd4">
+		<db:select doc:name="Select" doc:id="1409d021-fe58-4193-a77b-b36ed854969d" config-ref="Database_Config">
+			<db:sql><![CDATA[select ID,NoOfRoomsBooked, PNR from HotelBooking where PNR=:PNR]]></db:sql>
+			<db:input-parameters><![CDATA[#[{"PNR": vars.PNR}]]]></db:input-parameters>
+		</db:select>
+		<set-payload value="#[payload]" doc:name="Set Payload" doc:id="0a78dd28-1416-481c-891b-0ca9e17ad5f2" />
+		<set-variable value="#[payload.NoOfRoomsBooked[0]]" doc:name="Set Variable" doc:id="01c71202-5e4a-40fc-b9a7-ee6a567e2781" variableName="roomsBooked" />
+		<db:insert doc:name="Insert" doc:id="011c5abd-ff54-4318-a37e-29dc7f630a8d" config-ref="Database_Config" target="id" targetValue="#[payload.ID[0]]">
+			<db:sql><![CDATA[insert into HotelCancellation(ID, PNR) values(:id,:PNR)]]></db:sql>
+			<db:input-parameters><![CDATA[#[{"id": payload.ID[0],"PNR": vars.PNR}]]]></db:input-parameters>
+		</db:insert>
+		<db:delete doc:name="Delete" doc:id="26c9a4f9-9be8-4baf-b537-f870e14a2bbb" config-ref="Database_Config">
+			<db:sql><![CDATA[Delete from HotelBooking where PNR= :PNR]]></db:sql>
+			<db:input-parameters><![CDATA[#[{"PNR": vars.PNR}]]]></db:input-parameters>
+		</db:delete>
+		<db:update doc:name="Update" doc:id="1695b6ee-b50b-48d8-9bbf-1ad28a72ecd7" config-ref="Database_Config">
+			<db:sql><![CDATA[Update Hotel set AvailableRooms= (AvailableRooms + :roomsBooked) where ID= :id]]></db:sql>
+			<db:input-parameters><![CDATA[#[{"roomsBooked": vars.roomsBooked,"id": vars.id}]]]></db:input-parameters>
+		</db:update>
+		<ee:transform doc:name="Transform Message" doc:id="44e30d39-a9fa-416e-96ef-becfdee2a2ef">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/xml
+---
+{
+    cancelHotelResponse: {
+        cancellation: {
+            message: "Cancellation successful"
+            } 
+    }
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>

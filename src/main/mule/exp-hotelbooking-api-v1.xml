@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<mule xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns:xml-module="http://www.mulesoft.org/schema/mule/xml-module" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit-soap="http://www.mulesoft.org/schema/mule/apikit-soap" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/apikit-soap http://www.mulesoft.org/schema/mule/apikit-soap/current/mule-apikit-soap.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/xml-module http://www.mulesoft.org/schema/mule/xml-module/current/mule-xml-module.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd">
+    <http:listener-config name="api-httpListenerConfig">
+        <http:listener-connection host="0.0.0.0" port="8081"/>
+    </http:listener-config>
+    <apikit-soap:config httpStatusVarName="httpStatus" name="soapkit-config" port="HotelBookingWSDLSOAP" service="HotelBookingWSDL" wsdlLocation="HotelBookingWSDL.wsdl"/>
+    <flow name="api-main">
+        <http:listener config-ref="api-httpListenerConfig" path="/HotelBookingWSDL/HotelBookingWSDLSOAP">
+            <http:response statusCode="#[attributes.additionalTransportData.statusCode default 200]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[attributes.protocolHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[attributes.additionalTransportData.statusCode default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[attributes.protocolHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit-soap:router config-ref="soapkit-config" doc:id="8e16d12e-0508-483a-af71-b90533933044">
+            <apikit-soap:attributes><![CDATA[#[%dw 2.0
+              output application/java
+              ---
+              {
+                  headers: attributes.headers,
+                  method: attributes.method,
+                  queryString: attributes.queryString
+            }]]]></apikit-soap:attributes>
+        </apikit-soap:router>
+    </flow>
+	<flow name="FindHotel:\soapkit-config" doc:id="151d7333-37bb-4d90-a5bf-b10e79699aa1">
+		<set-variable doc:name="Set Variable" doc:id="069d4d18-1014-4edf-92de-691aa0fb85ca" variableName="location" value="#[%dw 2.0&#10;ns ns0 http://schemas.xmlsoap.org/HotelBookingWSDL/&#10;---&#10;message.payload.body.ns0#FindHotel.location]"/>
+		<validation:is-not-blank-string doc:name="Is not blank string" doc:id="010e0b83-3dee-4088-810b-d7b5c99c36ec" value="#[vars.location]" message='#["Please enter a location to search for hotels"]'/>
+		<flow-ref doc:name="Find Hotel by Location" doc:id="9d1ae832-23b5-4ed8-8829-c6aa6671d516" name="findHotel"/>
+    </flow>
+    <flow name="GetHotelList:\soapkit-config" doc:id="3ecce8d5-a319-49cc-b7da-3e5d374a95f9">
+		<flow-ref doc:name="Get Hotel List" doc:id="ef27946e-4a27-4514-b370-bc2e4079d8dc" name="getHotelList"/>
+    </flow>
+    <flow name="BookHotel:\soapkit-config">
+		<ee:transform doc:name="Transform Message" doc:id="6cde4b39-b448-42ac-b848-2442b1bce9cf" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+ns ns0 http://schemas.xmlsoap.org/HotelBookingWSDL/
+---
+{
+	id: payload.body.ns0#BookHotel.id default 0,
+	location: payload.body.ns0#BookHotel.location default "",
+	noOfRoomsBooked: payload.body.ns0#BookHotel.noOfRoomsBooked default 0
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<validation:is-number numberType="INTEGER" doc:name="Validate ID" doc:id="e06ff5ac-251e-4e84-b1cc-408a8cd3b72c" value="#[payload.id]" minValue="1" message='#["Please enter a valid Hotel ID"]' >
+		</validation:is-number>
+		<validation:is-not-blank-string doc:name="Is not blank string" doc:id="e62d4f43-96b6-4434-a2d9-09dad97db94d" value="#[payload.location]" message='#["Please enter a valid location"]' />
+		<validation:is-number doc:name="Validate required rooms" doc:id="de2f8b65-8f9d-45cb-881c-bf726ebf5b0d" value="#[payload.noOfRoomsBooked]" minValue="1" message='#["Please enter the number of rooms desired"]' numberType="INTEGER" />
+		<flow-ref doc:name="Flow Reference" doc:id="33829bde-f72e-4bde-b9c5-47237d2d9a6f" name="bookHotel"/>
+    </flow>
+    <flow name="HotelCancellation:\soapkit-config" doc:id="99c6a56d-d11e-4c1b-a9c9-93716dc110fc">
+        <set-variable value="#[%dw 2.0&#10;ns ns0 http://schemas.xmlsoap.org/HotelBookingWSDL/&#10;---&#10;payload.body.ns0#HotelCancellation.pnr]" doc:name="Set Variable" doc:id="a61dba25-31b0-4a3f-bcc1-d7bc084ff0ab" variableName="PNR"/>
+		<validation:is-number doc:name="Is number" doc:id="c5da4adf-50b2-4735-a307-8ef8714b7d52" value="#[vars.PNR]" minValue="10000" message='#["Please enter a valid PNR to be cancelled"]' numberType="INTEGER"/>
+		<flow-ref doc:name="Flow Reference" doc:id="76be0e0b-0a9b-461c-b872-a2fbd8aab441" name="cancelHotel"/>
+    </flow>
+</mule>

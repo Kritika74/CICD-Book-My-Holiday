@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<configuration-properties doc:name="Configuration properties" doc:id="83d778af-eb65-490d-a8ba-862f773c38b4" file="config.yaml" />
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="bdb14b8f-1fdc-4777-8507-9b4192645212" >
+		<db:my-sql-connection host="${database.server}" port="${database.port}" user="${database.username}" password="${database.password}" database="${database.dbName}" >
+			<reconnection >
+				<reconnect frequency="30000" />
+			</reconnection>
+		</db:my-sql-connection>
+	</db:config>
+	<configuration doc:name="Configuration" doc:id="5e6f700d-9c2f-42e2-b2e0-1c09bc2f8f89" defaultErrorHandler-ref="globalError_Handler" />
+	<error-handler name="globalError_Handler" doc:id="e78ece70-291a-4078-ac27-dac8a250da43" >
+		<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="3d833a59-2e67-4882-973f-ba33b35ddefa" type="VALIDATION:NULL,VALIDATION:INVALID_NUMBER,VALIDATION:BLANK_STRING,VALIDATION:INVALID_SIZE">
+			<ee:transform doc:name="Transform Message" doc:id="452d9e24-db8c-4e6f-bc5c-fdcb4d19eff3" >
+				<ee:message >
+					<ee:set-payload ><![CDATA[output application/xml
+ns soap http://schemas.xmlsoap.org/soap/envelope
+---
+{
+	soap#Fault: {
+    faultcode: error.errorType.namespace as String ++":"++ error.errorType.identifier as String,
+    faultstring: error.description
+    }
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+		</on-error-propagate>
+		<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="61c7c932-7c3c-451d-960c-b59b0d90c7df" type="ANY">
+			<ee:transform doc:name="Transform Message" doc:id="172442b5-13a4-4543-96b8-200b4143a972">
+				<ee:message>
+					<ee:set-payload><![CDATA[output application/xml
+ns soap http://schemas.xmlsoap.org/soap/envelope
+---
+{
+	soap#Fault: {
+    faultcode: error.errorType.namespace as String ++":"++ error.errorType.identifier as String,
+    faultstring: error.description
+    }
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+		</on-error-propagate>
+	</error-handler>
+</mule>
